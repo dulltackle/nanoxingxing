@@ -13,6 +13,7 @@ from nanobot.bus.events import OutboundMessage
 from nanobot.bus.queue import MessageBus
 from nanobot.channels.base import BaseChannel
 from nanobot.config.schema import DiscordConfig
+from nanobot.utils.helpers import get_nanobot_home
 
 
 DISCORD_API_BASE = "https://discord.com/api/v10"
@@ -236,7 +237,7 @@ class DiscordChannel(BaseChannel):
 
         content_parts = [content] if content else []
         media_paths: list[str] = []
-        media_dir = Path.home() / ".nanobot" / "media"
+        media_dir = get_nanobot_home() / "media"
 
         for attachment in payload.get("attachments") or []:
             url = attachment.get("url")

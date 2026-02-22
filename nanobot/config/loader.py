@@ -4,11 +4,12 @@ import json
 from pathlib import Path
 
 from nanobot.config.schema import Config
+from nanobot.utils.helpers import get_nanobot_home
 
 
 def get_config_path() -> Path:
     """Get the default configuration file path."""
-    return Path.home() / ".nanobot" / "config.json"
+    return get_nanobot_home() / "config.json"
 
 
 def get_data_dir() -> Path:

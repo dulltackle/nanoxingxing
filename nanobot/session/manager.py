@@ -8,7 +8,7 @@ from typing import Any
 
 from loguru import logger
 
-from nanobot.utils.helpers import ensure_dir, safe_filename
+from nanobot.utils.helpers import ensure_dir, safe_filename, get_nanobot_home
 
 
 @dataclass
@@ -69,7 +69,7 @@ class SessionManager:
     def __init__(self, workspace: Path):
         self.workspace = workspace
         self.sessions_dir = ensure_dir(self.workspace / "sessions")
-        self.legacy_sessions_dir = Path.home() / ".nanobot" / "sessions"
+        self.legacy_sessions_dir = get_nanobot_home() / "sessions"
         self._cache: dict[str, Session] = {}
     
     def _get_session_path(self, key: str) -> Path:
