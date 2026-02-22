@@ -19,7 +19,7 @@ if [[ "$CURRENT_BRANCH" != "local" ]]; then
 fi
 
 echo ">>> 从服务器拉取修改..."
-rsync -avz --exclude='.git' --exclude='node_modules' --exclude='__pycache__' --exclude='*.pyc' --exclude='.env' --exclude='*.local' --exclude='local/notes' --exclude='.venv' ${SERVER}:${SERVER_PATH}/ ./
+rsync -avz --exclude='.git' --exclude='node_modules' --exclude='__pycache__' --exclude='*.pyc' --exclude='.env' --exclude='.venv' --exclude='.vscode' ${SERVER}:${SERVER_PATH}/ ./
 
 echo ">>> 检查是否有变更..."
 if git diff --quiet && git diff --cached --quiet; then

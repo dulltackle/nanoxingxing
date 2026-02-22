@@ -31,7 +31,7 @@ echo ">>> 推送 local 到 GitHub..."
 git push origin local --force-with-lease
 
 echo ">>> 同步到服务器..."
-rsync -avz --exclude='.git' --exclude='node_modules' --exclude='__pycache__' --exclude='*.pyc' --exclude='.env' --exclude='*.local' --exclude='local/notes' --exclude='.venv' ./ ${SERVER}:${SERVER_PATH}/
+rsync -avz --exclude='.git' --exclude='node_modules' --exclude='__pycache__' --exclude='*.pyc' --exclude='.env' --exclude='.venv' --exclude='.vscode' ./ ${SERVER}:${SERVER_PATH}/
 
 git checkout "$ORIGINAL_BRANCH" 2>/dev/null || git checkout local
 

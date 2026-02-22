@@ -18,6 +18,6 @@ if [[ "$CURRENT_BRANCH" != "local" ]]; then
 fi
 
 echo ">>> 同步本地代码到服务器..."
-rsync -avz --exclude='.git' --exclude='node_modules' --exclude='__pycache__' --exclude='*.pyc' --exclude='.env' --exclude='*.local' --exclude='local/notes' --exclude='.venv' ./ ${SERVER}:${SERVER_PATH}/
+rsync -avz --exclude='.git' --exclude='node_modules' --exclude='__pycache__' --exclude='*.pyc' --exclude='.env' --exclude='.venv' --exclude='.vscode' ./ ${SERVER}:${SERVER_PATH}/
 
 echo ">>> 同步完成!"
