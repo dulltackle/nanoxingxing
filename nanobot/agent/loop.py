@@ -242,30 +242,60 @@ class AgentLoop:
         self._running = True
         await self._connect_mcp()
         logger.info("Agent loop started")
-
-        while self._running:
-            try:
-                msg = await asyncio.wait_for(
-                    self.bus.consume_inbound(),
-                    timeout=1.0
-                )
+        try:
+            while self._running:
                 try:
-                    response = await self._process_message(msg)
-                    if response is not None:
-                        await self.bus.publish_outbound(response)
-                    elif msg.channel == "cli":
+                    msg = await asyncio.wait_for(
+                        self.bus.consume_inbound(),
+                        timeout=1.0
+                    )
+                    try:
+                        response = await self._process_message(msg)
+                        if response is not None:
+                            await self.bus.publish_outbound(response)
+                        elif msg.channel == "cli":
+                            await self.bus.publish_outbound(OutboundMessage(
+                                channel=msg.channel, chat_id=msg.chat_id, content="", metadata=msg.metadata or {},
+                            ))
+                    except asyncio.CancelledError:
+                        logger.warning(
+                            "Message processing cancelled for {}:{}",
+                            msg.channel,
+                            msg.chat_id,
+                        )
+                        try:
+                            await self.bus.publish_outbound(OutboundMessage(
+                                channel=msg.channel,
+                                chat_id=msg.chat_id,
+                                content="Sorry, this request was cancelled before completion. Please try again.",
+                                metadata=msg.metadata or {},
+                            ))
+                        except asyncio.CancelledError:
+                            logger.warning(
+                                "Publishing cancellation notice was itself cancelled for {}:{}",
+                                msg.channel,
+                                msg.chat_id,
+                            )
+                        except Exception as e:
+                            logger.error(
+                                "Failed to publish cancellation notice for {}:{}: {}",
+                                msg.channel,
+                                msg.chat_id,
+                                e,
+                            )
+                        continue
+                    except Exception as e:
+                        logger.error("Error processing message: {}", e)
                         await self.bus.publish_outbound(OutboundMessage(
-                            channel=msg.channel, chat_id=msg.chat_id, content="", metadata=msg.metadata or {},
+                            channel=msg.channel,
+                            chat_id=msg.chat_id,
+                            content=f"Sorry, I encountered an error: {str(e)}"
                         ))
-                except Exception as e:
-                    logger.error("Error processing message: {}", e)
-                    await self.bus.publish_outbound(OutboundMessage(
-                        channel=msg.channel,
-                        chat_id=msg.chat_id,
-                        content=f"Sorry, I encountered an error: {str(e)}"
-                    ))
-            except asyncio.TimeoutError:
-                continue
+                except asyncio.TimeoutError:
+                    continue
+        except asyncio.CancelledError:
+            logger.info("Agent loop task cancelled")
+            raise
 
     async def close_mcp(self) -> None:
         """Close MCP connections."""

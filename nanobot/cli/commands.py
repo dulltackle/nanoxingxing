@@ -414,6 +414,8 @@ def gateway(
             )
         except KeyboardInterrupt:
             console.print("\nShutting down...")
+        except asyncio.CancelledError:
+            logger.info("Gateway run cancelled, proceeding to shutdown")
         finally:
             await agent.close_mcp()
             heartbeat.stop()
