@@ -283,6 +283,22 @@ class AgentLoop:
                                 msg.chat_id,
                                 e,
                             )
+                        current = asyncio.current_task()
+                        uncancel = getattr(current, "uncancel", None) if current else None
+                        if current and uncancel:
+                            cleared = 0
+                            try:
+                                while current.cancelling():
+                                    uncancel()
+                                    cleared += 1
+                            except Exception as e:
+                                logger.warning("Failed to clear pending cancellation state: {}", e)
+                            else:
+                                if cleared:
+                                    logger.debug(
+                                        "Cleared {} pending cancellation(s) after message-level cancellation",
+                                        cleared,
+                                    )
                         continue
                     except Exception as e:
                         logger.error("Error processing message: {}", e)
