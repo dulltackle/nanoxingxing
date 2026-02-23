@@ -35,13 +35,13 @@ class MCPToolWrapper(Tool):
     def parameters(self) -> dict[str, Any]:
         return self._parameters
 
-    async def _cancel_and_cleanup_call_task(self, call_task: asyncio.Task[Any], *, reason: str) -> None:
-        """Best-effort cancel/drain with a bounded cleanup wait."""
+    async def _cleanup_call_task_blocking(
+        self, call_task: asyncio.Task[Any], *, reason: str
+    ) -> None:
+        """Best-effort drain of a cancelled call task with a bounded wait."""
         if not call_task.done():
-            call_task.cancel()
             done, _ = await asyncio.wait(
-                {call_task},
-                timeout=self._CANCEL_CLEANUP_TIMEOUT_SECONDS,
+                {call_task}, timeout=self._CANCEL_CLEANUP_TIMEOUT_SECONDS
             )
             if not done:
                 logger.warning(
@@ -65,6 +65,41 @@ class MCPToolWrapper(Tool):
                 e,
             )
 
+    async def _cancel_and_cleanup_call_task_blocking(
+        self, call_task: asyncio.Task[Any], *, reason: str
+    ) -> None:
+        """Cancel and synchronously drain the task (used by timeout path)."""
+        if not call_task.done():
+            call_task.cancel()
+        await self._cleanup_call_task_blocking(call_task, reason=reason)
+
+    def _cancel_and_cleanup_call_task_background(
+        self, call_task: asyncio.Task[Any], *, reason: str
+    ) -> None:
+        """Cancel and detach cleanup so caller-cancelled paths avoid nested awaits."""
+        if not call_task.done():
+            call_task.cancel()
+
+        cleanup_task = asyncio.create_task(
+            self._cleanup_call_task_blocking(call_task, reason=reason)
+        )
+
+        def _consume_cleanup_result(task: asyncio.Task[Any]) -> None:
+            try:
+                task.result()
+            except asyncio.CancelledError:
+                # Event loop shutdown can cancel detached cleanup tasks.
+                return
+            except Exception as e:
+                logger.debug(
+                    "MCP tool '{}' background cleanup failed ({}): {}",
+                    self._name,
+                    reason,
+                    e,
+                )
+
+        cleanup_task.add_done_callback(_consume_cleanup_result)
+
     async def execute(self, **kwargs: Any) -> str:
         from mcp import types
         call_task = asyncio.create_task(
@@ -74,23 +109,14 @@ class MCPToolWrapper(Tool):
             done, _ = await asyncio.wait({call_task}, timeout=self._tool_timeout)
             if not done:
                 logger.warning("MCP tool '{}' timed out after {}s", self._name, self._tool_timeout)
-                await self._cancel_and_cleanup_call_task(call_task, reason="after timeout")
+                await self._cancel_and_cleanup_call_task_blocking(call_task, reason="after timeout")
                 return f"(MCP tool call timed out after {self._tool_timeout}s)"
 
             result = await call_task
         except asyncio.CancelledError:
-            current = asyncio.current_task()
-            shutting_down = bool(current and current.cancelling())
-            try:
-                await self._cancel_and_cleanup_call_task(call_task, reason="after caller cancellation")
-            except asyncio.CancelledError:
-                # Cleanup itself can be interrupted during shutdown; preserve outer cancellation.
-                if shutting_down:
-                    raise
-            if shutting_down:
-                # Agent/service shutdown: propagate cancellation so upper layers can stop cleanly.
-                raise
-
+            self._cancel_and_cleanup_call_task_background(
+                call_task, reason="after caller cancellation"
+            )
             logger.warning("MCP tool '{}' was cancelled before completion", self._name)
             return "(MCP tool call was cancelled)"
         parts = []
