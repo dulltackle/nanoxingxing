@@ -23,29 +23,38 @@ You have access to:
 - `memory/MEMORY.md` — long-term facts (preferences, context, relationships)
 - `memory/HISTORY.md` — append-only event log, search with grep to recall past events
 
-## Scheduled Reminders
+## Reminders & Tasks
 
-When user asks for a reminder at a specific time, use `exec` to run:
-```
-nanobot cron add --name "reminder" --message "Your message" --at "YYYY-MM-DDTHH:MM:SS" --deliver --to "USER_ID" --channel "CHANNEL"
-```
-Get USER_ID and CHANNEL from the current session (e.g., `8281248569` and `telegram` from `telegram:8281248569`).
+**完整操作规范请参考 `nanobot/skills/reminder/SKILL.md`**
 
-**Do NOT just write reminders to MEMORY.md** — that won't trigger actual notifications.
+### 提醒待办（Cron）
 
-## Heartbeat Tasks
+使用 `cron` 工具管理提醒待办（优先级高于 `exec` + CLI）：
 
-`HEARTBEAT.md` is checked every 30 minutes. You can manage periodic tasks by editing this file:
+```python
+# 增
+cron(action="add", message="开会提醒", at="2026-02-24T10:00:00")  # 一次性
+cron(action="add", message="喝水", every_seconds=7200)           # 周期性
+cron(action="add", message="早会", cron_expr="0 9 * * 1-5")      # cron表达式
 
-- **Add a task**: Use `edit_file` to append new tasks to `HEARTBEAT.md`
-- **Remove a task**: Use `edit_file` to remove completed or obsolete tasks
-- **Rewrite tasks**: Use `write_file` to completely rewrite the task list
+# 查
+cron(action="list")
 
-Task format examples:
-```
-- [ ] Check calendar and remind of upcoming events
-- [ ] Scan inbox for urgent emails
-- [ ] Check weather forecast for today
+# 删
+cron(action="remove", job_id="abc123")
+
+# 改：先删后增
 ```
 
-When the user asks you to add a recurring/periodic task, update `HEARTBEAT.md` instead of creating a one-time reminder. Keep the file small to minimize token usage.
+⚠️ **不要把提醒写在 MEMORY.md** — 那不会触发实际通知。
+
+### 周期性智能任务（Heartbeat）
+
+`HEARTBEAT.md` 每 30 分钟检查一次，用于智能周期检查（如扫描邮件、检查日历）：
+
+```markdown
+- [ ] 检查今日日程并提醒
+- [ ] 扫描收件箱中的紧急邮件
+```
+
+使用 `edit_file` 添加/删除任务，保持文件精简。
