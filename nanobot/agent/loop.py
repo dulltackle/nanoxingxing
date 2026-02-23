@@ -249,8 +249,10 @@ class AgentLoop:
                         self.bus.consume_inbound(),
                         timeout=1.0
                     )
+                    msg_task: asyncio.Task | None = None
                     try:
-                        response = await self._process_message(msg)
+                        msg_task = asyncio.create_task(self._process_message(msg))
+                        response = await msg_task
                         if response is not None:
                             await self.bus.publish_outbound(response)
                         elif msg.channel == "cli":
@@ -258,6 +260,13 @@ class AgentLoop:
                                 channel=msg.channel, chat_id=msg.chat_id, content="", metadata=msg.metadata or {},
                             ))
                     except asyncio.CancelledError:
+                        parent_task = asyncio.current_task()
+                        parent_cancelled = bool(parent_task and parent_task.cancelling())
+                        if parent_cancelled:
+                            if msg_task is not None and not msg_task.done():
+                                msg_task.cancel()
+                            raise
+
                         logger.warning(
                             "Message processing cancelled for {}:{}",
                             msg.channel,
@@ -283,22 +292,6 @@ class AgentLoop:
                                 msg.chat_id,
                                 e,
                             )
-                        current = asyncio.current_task()
-                        uncancel = getattr(current, "uncancel", None) if current else None
-                        if current and uncancel:
-                            cleared = 0
-                            try:
-                                while current.cancelling():
-                                    uncancel()
-                                    cleared += 1
-                            except Exception as e:
-                                logger.warning("Failed to clear pending cancellation state: {}", e)
-                            else:
-                                if cleared:
-                                    logger.debug(
-                                        "Cleared {} pending cancellation(s) after message-level cancellation",
-                                        cleared,
-                                    )
                         continue
                     except Exception as e:
                         logger.error("Error processing message: {}", e)
