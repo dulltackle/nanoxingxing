@@ -13,6 +13,7 @@ from nanobot.agent.tools.registry import ToolRegistry
 
 class MCPToolWrapper(Tool):
     """Wraps a single MCP server tool as a nanobot Tool."""
+    _CANCEL_CLEANUP_TIMEOUT_SECONDS = 2.0
 
     def __init__(self, session, server_name: str, tool_def, tool_timeout: int = 30):
         self._session = session
@@ -34,18 +35,63 @@ class MCPToolWrapper(Tool):
     def parameters(self) -> dict[str, Any]:
         return self._parameters
 
+    async def _cancel_and_cleanup_call_task(self, call_task: asyncio.Task[Any], *, reason: str) -> None:
+        """Best-effort cancel/drain with a bounded cleanup wait."""
+        if not call_task.done():
+            call_task.cancel()
+            done, _ = await asyncio.wait(
+                {call_task},
+                timeout=self._CANCEL_CLEANUP_TIMEOUT_SECONDS,
+            )
+            if not done:
+                logger.warning(
+                    "MCP tool '{}' cleanup timed out after {}s ({})",
+                    self._name,
+                    self._CANCEL_CLEANUP_TIMEOUT_SECONDS,
+                    reason,
+                )
+                return
+
+        try:
+            await call_task
+        except asyncio.CancelledError:
+            # Expected when the task is cancelled (including anyio-backed cancellation).
+            return
+        except Exception as e:
+            logger.debug(
+                "MCP tool '{}' raised during cleanup ({}): {}",
+                self._name,
+                reason,
+                e,
+            )
+
     async def execute(self, **kwargs: Any) -> str:
         from mcp import types
+        call_task = asyncio.create_task(
+            self._session.call_tool(self._original_name, arguments=kwargs)
+        )
         try:
-            result = await asyncio.wait_for(
-                self._session.call_tool(self._original_name, arguments=kwargs),
-                timeout=self._tool_timeout,
-            )
-        except asyncio.TimeoutError:
-            logger.warning("MCP tool '{}' timed out after {}s", self._name, self._tool_timeout)
-            return f"(MCP tool call timed out after {self._tool_timeout}s)"
+            done, _ = await asyncio.wait({call_task}, timeout=self._tool_timeout)
+            if not done:
+                logger.warning("MCP tool '{}' timed out after {}s", self._name, self._tool_timeout)
+                await self._cancel_and_cleanup_call_task(call_task, reason="after timeout")
+                return f"(MCP tool call timed out after {self._tool_timeout}s)"
+
+            result = await call_task
         except asyncio.CancelledError:
-            logger.warning("MCP tool '{}' was cancelled", self._name)
+            current = asyncio.current_task()
+            shutting_down = bool(current and current.cancelling())
+            try:
+                await self._cancel_and_cleanup_call_task(call_task, reason="after caller cancellation")
+            except asyncio.CancelledError:
+                # Cleanup itself can be interrupted during shutdown; preserve outer cancellation.
+                if shutting_down:
+                    raise
+            if shutting_down:
+                # Agent/service shutdown: propagate cancellation so upper layers can stop cleanly.
+                raise
+
+            logger.warning("MCP tool '{}' was cancelled before completion", self._name)
             return "(MCP tool call was cancelled)"
         parts = []
         for block in result.content:
