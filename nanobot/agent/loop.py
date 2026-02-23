@@ -252,21 +252,23 @@ class AgentLoop:
                     msg_task: asyncio.Task | None = None
                     try:
                         msg_task = asyncio.create_task(self._process_message(msg))
-                        response = await msg_task
-                        if response is not None:
-                            await self.bus.publish_outbound(response)
-                        elif msg.channel == "cli":
-                            await self.bus.publish_outbound(OutboundMessage(
-                                channel=msg.channel, chat_id=msg.chat_id, content="", metadata=msg.metadata or {},
-                            ))
+                        await asyncio.wait({msg_task})
                     except asyncio.CancelledError:
-                        parent_task = asyncio.current_task()
-                        parent_cancelled = bool(parent_task and parent_task.cancelling())
-                        if parent_cancelled:
+                        try:
                             if msg_task is not None and not msg_task.done():
                                 msg_task.cancel()
-                            raise
+                            if msg_task is not None:
+                                await asyncio.gather(msg_task, return_exceptions=True)
+                        except asyncio.CancelledError:
+                            pass
+                        except Exception:
+                            pass
+                        raise
 
+                    if msg_task is None:
+                        continue
+
+                    if msg_task.cancelled():
                         logger.warning(
                             "Message processing cancelled for {}:{}",
                             msg.channel,
@@ -293,12 +295,23 @@ class AgentLoop:
                                 e,
                             )
                         continue
-                    except Exception as e:
-                        logger.error("Error processing message: {}", e)
+
+                    msg_exc = msg_task.exception()
+                    if msg_exc is not None:
+                        logger.error("Error processing message: {}", msg_exc)
                         await self.bus.publish_outbound(OutboundMessage(
                             channel=msg.channel,
                             chat_id=msg.chat_id,
-                            content=f"Sorry, I encountered an error: {str(e)}"
+                            content=f"Sorry, I encountered an error: {str(msg_exc)}"
+                        ))
+                        continue
+
+                    response = msg_task.result()
+                    if response is not None:
+                        await self.bus.publish_outbound(response)
+                    elif msg.channel == "cli":
+                        await self.bus.publish_outbound(OutboundMessage(
+                            channel=msg.channel, chat_id=msg.chat_id, content="", metadata=msg.metadata or {},
                         ))
                 except asyncio.TimeoutError:
                     continue
