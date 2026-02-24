@@ -10,6 +10,14 @@ This file stores important information that should persist across sessions.
 
 (User preferences learned over time)
 
+## Project Context
+
+(Information about ongoing projects)
+
 ## Important Notes
 
 (Things to remember)
+
+---
+
+_This file is automatically updated by nanobot when important information should be remembered._
