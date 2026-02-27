@@ -1,6 +1,7 @@
 """Utility functions for nanobot."""
 
 import os
+import re
 from pathlib import Path
 from datetime import datetime
 
