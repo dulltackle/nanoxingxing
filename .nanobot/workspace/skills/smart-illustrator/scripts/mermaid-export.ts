@@ -57,13 +57,15 @@ async function exportMermaid(
   height?: number
 ): Promise<void> {
   const puppeteerConfig = resolve(SCRIPTS_DIR, 'puppeteer-config.json');
-  
+  const cssTheme = resolve(SCRIPTS_DIR, 'mermaid-theme-cn.css');
+
   const args = [
     '-i', input,
     '-o', output,
     '-t', themeConfig.theme,
     '-b', themeConfig.backgroundColor,
-    '-p', puppeteerConfig
+    '-p', puppeteerConfig,
+    '-C', cssTheme  // Use Chinese font CSS by default
   ];
 
   if (width) {

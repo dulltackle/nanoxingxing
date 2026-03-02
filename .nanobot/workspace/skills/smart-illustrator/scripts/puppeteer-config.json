@@ -1,4 +1,8 @@
 {
-  "executablePath": "/usr/bin/google-chrome",
-  "headless": true
+  "executablePath": "/usr/bin/chromium",
+  "headless": true,
+  "args": [
+    "--no-sandbox",
+    "--disable-setuid-sandbox"
+  ]
 }

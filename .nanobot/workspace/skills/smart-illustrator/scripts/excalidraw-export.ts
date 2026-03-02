@@ -44,9 +44,9 @@ async function exportWithPlaywright(opts: ExportOptions): Promise<void> {
   const absInput = resolve(opts.input);
   const absOutput = resolve(opts.output);
 
-  const browser = await chromium.launch({ 
-    headless: true, 
-    channel: "chrome",
+  const browser = await chromium.launch({
+    headless: true,
+    channel: "chromium",
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",

@@ -1,0 +1,51 @@
+/**
+ * Mermaid 中文主题配置
+ * 确保中文字体正确显示
+ */
+
+:root {
+  /* 字体优先级：Noto Sans CJK SC (开源) > WenQuanYi Micro Hei (开源) > 微软雅黑 (Windows) > 黑体 (Mac) > sans-serif */
+  --mermaid-font-family: 'Noto Sans CJK SC', 'WenQuanYi Micro Hei', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  --mermaid-font-family-node: var(--mermaid-font-family);
+  --mermaid-font-family-label: var(--mermaid-font-family);
+}
+
+/* 所有文本元素 */
+.entityLabel, .labelText, .nodeLabel, .edgeLabel, .clusterLabel, .actorLabel, .messageText,
+.legendText, .titleText, .sectionTitle {
+  font-family: var(--mermaid-font-family) !important;
+}
+
+/* 浅色主题 */
+.theme-neutral,
+.theme-default,
+.theme-base {
+  --primary-color: #ECECFF;
+  --primary-text-color: #1e1e1e;
+  --primary-border-color: #9370DB;
+  --line-color: #333333;
+  --secondary-color: #fff;
+  --tertiary-color: #fff;
+  --background: #ffffff;
+  --main-bkg: #ECECFF;
+  --node-border: #9370DB;
+  --cluster-bkg: #fff;
+  --node-text: #1e1e1e;
+  --label-text: #1e1e1e;
+}
+
+/* 暗色主题 */
+.theme-dark {
+  --primary-color: #333333;
+  --primary-text-color: #e6e6e6;
+  --primary-border-color: #555555;
+  --line-color: #e6e6e6;
+  --secondary-color: #4d4d4d;
+  --tertiary-color: #2b2b2b;
+  --background: transparent;
+  --main-bkg: #333333;
+  --node-border: #555555;
+  --cluster-bkg: #2b2b2b;
+  --node-text: #e6e6e6;
+  --label-text: #e6e6e6;
+}
